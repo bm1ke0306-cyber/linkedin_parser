@@ -11,31 +11,19 @@ from selenium.webdriver.support import expected_conditions as EC
 app = Flask(__name__)
 
 def get_linkedin_data(url):
-    # 1. Автоматический поиск путей в системе
-    chrome_path = shutil.which("google-chrome") or shutil.which("google-chrome-stable") or shutil.which("chrome")
-    driver_path = shutil.which("chromedriver")
-
-    # Проверка для логов
-    print(f"DEBUG: Found Chrome at: {chrome_path}")
-    print(f"DEBUG: Found Driver at: {driver_path}")
-
-    if not chrome_path or not driver_path:
-        return {
-            "error": f"Environment error: Chrome ({chrome_path}) or Driver ({driver_path}) not found",
-            "status": "error"
-        }
-
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
-    chrome_options.binary_location = chrome_path
-
+    
+    # В этом Docker-образе пути всегда такие:
+    chrome_options.binary_location = "/usr/bin/google-chrome"
+    
     driver = None
     try:
-        service = Service(executable_path=driver_path)
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+        # Selenium сам найдет chromedriver, установленный в систему
+        driver = webdriver.Chrome(options=chrome_options)
         
         driver.set_page_load_timeout(20)
         driver.get(url)
