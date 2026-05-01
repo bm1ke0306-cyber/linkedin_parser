@@ -11,73 +11,43 @@ app = Flask(__name__)
 
 def get_linkedin_data(url):
     chrome_options = Options()
-    # Базовые настройки для работы в Docker/Railway
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    
-    # Имитируем реального пользователя
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    # Явно указываем путь к Chrome для Nixpacks (Railway)
+    # Явно указываем пути для Railway
     chrome_options.binary_location = "/usr/bin/google-chrome"
     
     driver = None
     try:
-        # В Nixpacks chromedriver уже в PATH, поэтому Service указывать не обязательно
-        driver = webdriver.Chrome(options=chrome_options)
+        # Указываем путь к chromedriver вручную
+        service = Service(executable_path="/usr/bin/chromedriver")
+        driver = webdriver.Chrome(service=service, options=chrome_options)
         
-        # Устанавливаем таймаут загрузки страницы
         driver.set_page_load_timeout(30)
         driver.get(url)
         
+        # ... далее ваш код поиска title и company без изменений ...
         wait = WebDriverWait(driver, 15)
+        title_el = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1.top-card-layout__title, .topcard__title, h1")))
+        title = title_el.text.strip()
         
-        # 1. Ищем название вакансии (несколько вариантов селекторов)
-        title_selectors = [
-            "h1.top-card-layout__title", 
-            ".topcard__title", 
-            "h1", 
-            "h2.top-card-layout__title"
-        ]
-        title = "Не найдено"
-        for selector in title_selectors:
-            try:
-                el = driver.find_element(By.CSS_SELECTOR, selector)
-                if el.text.strip():
-                    title = el.text.strip()
-                    break
-            except:
-                continue
-        
-        # 2. Ищем название компании
-        company_selectors = [
-            "a.topcard__org-name-link", 
-            ".topcard__flavor a", 
-            ".top-card-layout__first-subline a",
-            "[data-tracking-control-name='public_jobs_topcard_org_name']"
-        ]
-        company = "Не найдена"
-        for selector in company_selectors:
-            try:
-                el = driver.find_element(By.CSS_SELECTOR, selector)
-                if el.text.strip():
-                    company = el.text.strip()
-                    break
-            except:
-                continue
+        try:
+            comp_el = driver.find_element(By.CSS_SELECTOR, "a.topcard__org-name-link, .topcard__flavor a")
+            company = comp_el.text.strip()
+        except:
+            company = "Не найдена"
 
         return {"title": title, "company": company, "status": "success"}
 
     except Exception as e:
         return {"error": str(e), "status": "error"}
-    
     finally:
         if driver:
             driver.quit()
-
 @app.route('/')
 def health_check():
     return "Server is running!", 200
