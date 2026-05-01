@@ -3,6 +3,7 @@ import shutil
 from flask import Flask, request, jsonify
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -16,30 +17,34 @@ def get_linkedin_data(url):
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     
-    # Очень важно для Railway: явно указываем, где лежит сам Chrome
-    chrome_path = shutil.which("google-chrome") or shutil.which("chrome") or "/usr/bin/google-chrome"
-    chrome_options.binary_location = chrome_path
+    # Пути в Nixpacks/Railway обычно такие:
+    chrome_bin = "/usr/bin/google-chrome"
+    driver_bin = "/usr/bin/chromedriver"
+    
+    chrome_options.binary_location = chrome_bin
 
     driver = None
     try:
-        # В этой версии Selenium (4.11+) мы не передаем executable_path в Service, 
-        # если драйвер уже есть в системном PATH (/usr/bin/chromedriver)
-        driver = webdriver.Chrome(options=chrome_options)
+        # ЖЕСТКО указываем путь к драйверу, чтобы Selenium не лез в /root/.cache
+        service = Service(executable_path=driver_bin)
+        driver = webdriver.Chrome(service=service, options=chrome_options)
         
         driver.set_page_load_timeout(20)
         driver.get(url)
         
+        # Ждем появления заголовка
         wait = WebDriverWait(driver, 10)
-        # Упрощенный поиск заголовка
         title_el = wait.until(EC.presence_of_element_located((By.TAG_NAME, "h1")))
-        title = title_el.text.strip()
         
-        return {"title": title, "status": "success"}
+        return {
+            "title": title_el.text.strip(),
+            "status": "success"
+        }
 
     except Exception as e:
-        # Если снова будет ошибка "Unable to obtain driver", 
-        # мы увидим подробности в логах
-        print(f"FAILED. Chrome: {chrome_path}")
+        # Выводим в лог реальные пути для проверки
+        print(f"ERROR LOG: Chrome exists: {os.path.exists(chrome_bin)}")
+        print(f"ERROR LOG: Driver exists: {os.path.exists(driver_bin)}")
         return {"error": str(e), "status": "error"}
     finally:
         if driver:
