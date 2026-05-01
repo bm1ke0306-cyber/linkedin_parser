@@ -2,7 +2,7 @@ import os
 from flask import Flask, request, jsonify
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.service import Service  # Проверьте эту строку!
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -18,28 +18,31 @@ def get_linkedin_data(url):
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    # Railway/Docker специфичная настройка
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-    
     try:
+        # Установка драйвера через менеджер
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
         driver.get(url)
         wait = WebDriverWait(driver, 15)
         
-        # Поиск заголовка
+        # Пытаемся найти заголовок вакансии
         title_el = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1.top-card-layout__title, .topcard__title, h1")))
+        title = title_el.text.strip()
         
-        # Поиск компании
+        # Пытаемся найти компанию
         try:
-            comp_el = driver.find_element(By.CSS_SELECTOR, "a.topcard__org-name-link, [data-tracking-control-name='public_jobs_topcard_org_name'], .topcard__flavor a")
+            comp_el = driver.find_element(By.CSS_SELECTOR, "a.topcard__org-name-link, .topcard__flavor a, .top-card-layout__first-subline a")
             company = comp_el.text.strip()
         except:
             company = "Не найдена"
 
-        return {"title": title_el.text.strip(), "company": company}
+        return {"title": title, "company": company}
     except Exception as e:
         return {"error": str(e)}
     finally:
-        driver.quit()
+        if 'driver' in locals():
+            driver.quit()
 
 @app.route('/parse')
 def parse():
