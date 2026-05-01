@@ -16,22 +16,49 @@ def get_linkedin_data(url):
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    # В этом Docker-образе пути всегда такие:
     chrome_options.binary_location = "/usr/bin/google-chrome"
     
     driver = None
     try:
-        # Selenium сам найдет chromedriver, установленный в систему
         driver = webdriver.Chrome(options=chrome_options)
-        
         driver.set_page_load_timeout(20)
         driver.get(url)
         
-        wait = WebDriverWait(driver, 10)
-        title_el = wait.until(EC.presence_of_element_located((By.TAG_NAME, "h1")))
+        wait = WebDriverWait(driver, 15)
         
-        return {"title": title_el.text.strip(), "status": "success"}
+        # --- ПОИСК ЗАГОЛОВКА ---
+        title = "Не найдено"
+        try:
+            title_el = wait.until(EC.presence_of_element_located((By.TAG_NAME, "h1")))
+            title = title_el.text.strip()
+        except:
+            pass
+
+        # --- ПОИСК КОМПАНИИ (ПЕРЕБОРОМ СЕЛЕКТОРОВ) ---
+        company = "Не найдена"
+        company_selectors = [
+            "span.topcard__flavor", 
+            "a.topcard__org-name-link",
+            "a[data-tracking-control-name='public_jobs_topcard_org_name']",
+            ".top-card-layout__first-subline a",
+            ".base-main-card__subtitle",
+            "span.top-card-layout__first-subline"
+        ]
+        
+        for selector in company_selectors:
+            try:
+                el = driver.find_element(By.CSS_SELECTOR, selector)
+                text = el.text.strip()
+                if text:
+                    # Чистим текст от лишних слов (например, если там "Company Name • Location")
+                    company = text.split('\n')[0].split(' • ')[0]
+                    break
+            except:
+                continue
+        
+        return {"title": title, "company": company, "status": "success"}
 
     except Exception as e:
         return {"error": str(e), "status": "error"}
