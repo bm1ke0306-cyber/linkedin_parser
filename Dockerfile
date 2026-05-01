@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Устанавливаем зависимости для Chrome
+# Устанавливаем системные зависимости
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -22,13 +22,13 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     && apt-get clean
 
-# Устанавливаем Google Chrome
-RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list \
+# Устанавливаем Google Chrome (новый способ без apt-key)
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
     && apt-get install -y google-chrome-stable
 
-# Копируем проект
+# Устанавливаем рабочую директорию
 WORKDIR /app
 COPY . .
 
@@ -38,5 +38,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Открываем порт
 EXPOSE 8080
 
-# Запуск через gunicorn (более стабильно для Railway) или просто python
+# Запуск приложения
 CMD ["python", "app.py"]
