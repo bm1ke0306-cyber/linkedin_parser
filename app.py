@@ -11,40 +11,41 @@ from selenium.webdriver.support import expected_conditions as EC
 app = Flask(__name__)
 
 def get_linkedin_data(url):
+    # 1. Автоматический поиск путей в системе
+    chrome_path = shutil.which("google-chrome") or shutil.which("google-chrome-stable") or shutil.which("chrome")
+    driver_path = shutil.which("chromedriver")
+
+    # Проверка для логов
+    print(f"DEBUG: Found Chrome at: {chrome_path}")
+    print(f"DEBUG: Found Driver at: {driver_path}")
+
+    if not chrome_path or not driver_path:
+        return {
+            "error": f"Environment error: Chrome ({chrome_path}) or Driver ({driver_path}) not found",
+            "status": "error"
+        }
+
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
-    
-    # Пути в Nixpacks/Railway обычно такие:
-    chrome_bin = "/usr/bin/google-chrome"
-    driver_bin = "/usr/bin/chromedriver"
-    
-    chrome_options.binary_location = chrome_bin
+    chrome_options.binary_location = chrome_path
 
     driver = None
     try:
-        # ЖЕСТКО указываем путь к драйверу, чтобы Selenium не лез в /root/.cache
-        service = Service(executable_path=driver_bin)
+        service = Service(executable_path=driver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
         driver.set_page_load_timeout(20)
         driver.get(url)
         
-        # Ждем появления заголовка
         wait = WebDriverWait(driver, 10)
         title_el = wait.until(EC.presence_of_element_located((By.TAG_NAME, "h1")))
         
-        return {
-            "title": title_el.text.strip(),
-            "status": "success"
-        }
+        return {"title": title_el.text.strip(), "status": "success"}
 
     except Exception as e:
-        # Выводим в лог реальные пути для проверки
-        print(f"ERROR LOG: Chrome exists: {os.path.exists(chrome_bin)}")
-        print(f"ERROR LOG: Driver exists: {os.path.exists(driver_bin)}")
         return {"error": str(e), "status": "error"}
     finally:
         if driver:
@@ -53,8 +54,7 @@ def get_linkedin_data(url):
 @app.route('/parse')
 def parse():
     job_url = request.args.get('url')
-    if not job_url:
-        return jsonify({"error": "No URL"}), 400
+    if not job_url: return jsonify({"error": "No URL"}), 400
     return jsonify(get_linkedin_data(job_url))
 
 if __name__ == "__main__":
